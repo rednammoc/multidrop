@@ -1,7 +1,7 @@
 multidrop
 =========
 
-Usage: multidrop 
+Usage: multidrop  
 	-s|--start [NAME]	Start configured dropbox with specified name  
 	-S|--START			Start all configured dropboxes  
 	-i|--install [NAME]	Install configured dropbox with specified name  
