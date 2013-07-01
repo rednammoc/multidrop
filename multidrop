@@ -1,0 +1,206 @@
+#!/bin/bash
+# 
+# @Name: multidrop
+# @Version: 0.8
+# @Description: Handle multiple dropbox-accounts.
+# @Author: rednammoc
+# @Date: 13/07/01
+#
+CURRENT_USER="${USER}"
+DROPBOX_BIN="/usr/bin/dropbox"
+
+# read config will read $CONFIG_FILE and store values as array
+# 	into $CONFIG_LOCATIONS and $CONFIG_NAMES
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+CONFIG_FILE="$DIR/multidrop.conf"
+CONFIG_LOCATIONS=()
+CONFIG_NAMES=()
+
+usage ()
+{
+	echo "Usage: $0"
+	echo
+	echo -e "-s|--start [NAME]\tStart configured dropbox with specified name"
+	echo -e "-S|--START\t\tStart all configured dropboxes"
+	echo -e "-i|--install [NAME]\tInstall configured dropbox with specified name"
+	echo -e "-I|--INSTALL\t\tInstall all configured dropboxes"
+	echo -e "-l|--list\t\tList all configured dropboxes"
+	echo -e "-h|--help\t\tShow help"
+	echo
+	return 0
+}
+
+# read config file and stores values as array.
+# 	array can be accessed by get_location_by_name () or by the global
+# 	variables $CONFIG_LOCATIONS and $CONFIG_NAMES.
+read_config ()
+{
+	if [ -f "${CONFIG_FILE}" ]
+	then
+		#echo "[INFO] Reading config at \"$CONFIG_FILE\" ..."
+		while IFS=$'\t' read -r NAME LOCATION
+		do
+			case $NAME in
+				\#*) 
+				# Skipping comment
+				continue
+				;;
+				*)  
+				eval LOCATION=$LOCATION
+				CONFIG_LOCATIONS=( 
+					"${CONFIG_LOCATIONS[@]}" "$LOCATION" 
+				)				
+				CONFIG_NAMES=( 
+					"${CONFIG_NAMES[@]}" "$NAME" 
+				)
+				;;
+			esac
+		done < $CONFIG_FILE
+		return 0
+	else
+		echo "[ERROR] Configuration file \"$CONFIG_FILE\" does not exist!"
+		return 1
+	fi
+}
+
+list ()
+{
+	for (( i = 0 ; i < ${#CONFIG_NAMES[@]} ; i++ ))
+	do
+		echo -e "${CONFIG_NAMES[$i]}\t${CONFIG_LOCATIONS[$i]}"
+	done
+	
+	return 0
+}
+
+get_location_by_name ()
+{
+	local BY_NAME="$1"
+	for (( i = 0 ; i < ${#CONFIG_NAMES[@]} ; i++ ))
+	do
+		if [[ "$BY_NAME" == "${CONFIG_NAMES[$i]}" ]]
+		then
+			echo "${CONFIG_LOCATIONS[$i]}"
+			return 0
+		fi
+	done
+	
+	return 1
+}
+
+start_all ()
+{
+	for NAME in ${CONFIG_NAMES[@]}
+	do
+		start_dropbox "$NAME" 
+	done
+	return 0
+}
+
+start_dropbox ()
+{
+	NAME=$1
+	LOCATION=$(get_location_by_name "$NAME")
+	if [ $? -eq 0 ]
+	then
+		echo "[INFO] Starting \"$NAME\" at \"$LOCATION\" ..." 
+		if [ ! -d "$LOCATION" ]
+		then
+			echo "[WARNING] Creating \"$LOCATION\" ..."
+			mkdir -p "$LOCATION"
+		fi
+		sudo -u $CURRENT_USER HOME=$LOCATION $DROPBOX_BIN start
+	else
+		echo "[ERROR] Retrieving location of \"$NAME\" failed!"
+		echo "[ERROR] Starting \"$NAME\" failed!"
+		return 1
+	fi
+	return 0
+}
+
+install_all ()
+{
+	for NAME in ${CONFIG_NAMES[@]}
+	do
+		install_dropbox "$NAME"
+	done
+	return 0
+}
+
+install_dropbox ()
+{
+	NAME=$1
+	LOCATION=$(get_location_by_name "$NAME")
+	if [ $? -eq 0 ]
+	then
+		echo "[INFO] Installing \"$NAME\" at \"$LOCATION\" ..." 
+		if [ ! -d "$LOCATION" ]
+		then
+			echo "[WARNING] Creating \"$LOCATION\" ..."
+			mkdir -p "$LOCATION"
+		fi
+		sudo -u $CURRENT_USER HOME=$LOCATION $DROPBOX_BIN start -i
+	else
+		echo "[ERROR] Retrieving location of \"$NAME\" failed!"
+		echo "[ERROR] Installing \"$NAME\" failed!"
+		return 1
+	fi
+	return 0
+}
+
+
+if [ $# -eq 0 ]
+then
+	usage
+	exit 1
+fi
+
+read_config
+rc=$?
+if [[ $rc != 0 ]] 
+then
+	exit $rc
+fi
+
+ARGS=`getopt -o "Ss:Ii:lh" -l "START,start:,INSTALL,install:,list,help" \
+	-n "dropbox" -- "$@"`
+eval set -- "$ARGS"
+while true
+do
+	case "$1" in
+		-S|--START)
+			start_all
+			shift
+			;;
+		-s|--start)
+			if [ -n "$2" ]
+			then
+				start_dropbox "$2"
+				shift 2
+			fi
+			;;
+		-I|--INSTALL)
+			install_all
+			shift
+			;;
+		-i|--install)
+			if [ -n "$2" ]
+			then
+				install_dropbox "$2"
+				shift 2
+			fi
+			;;
+		-l|--list)
+			list
+			shift
+			;;
+		-h|--help)
+			usage
+			exit 1
+			;;
+		--)
+			shift
+			break
+			;;
+	esac
+done
