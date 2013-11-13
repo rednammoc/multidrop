@@ -11,8 +11,9 @@ DROPBOX_BIN="/usr/bin/dropbox"
 
 # read config will read $CONFIG_FILE and store values as array
 # 	into $CONFIG_LOCATIONS and $CONFIG_NAMES
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-CONFIG_FILE="$DIR/multidrop.conf"
+SCRIPT="`readlink -e $0`"
+SCRIPTPATH="`dirname $SCRIPT`"
+CONFIG_FILE="$SCRIPTPATH/multidrop.conf"
 CONFIG_LOCATIONS=()
 CONFIG_NAMES=()
 
